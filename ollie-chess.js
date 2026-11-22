@@ -36,30 +36,62 @@ p.innerHTML=`<button id="_alx">✕</button>
 d.documentElement.appendChild(p);
 d.getElementById('_alx').onclick=function(){p.remove();clrArr()};
 
-var drag=false,ox=0,oy=0,sx=0,sy=0;
+/* ── DRAG — both axes, persists across multiple drags ── */
+var drag=false,curX=null,curY=null,sx=0,sy=0;
 p.addEventListener('touchstart',function(e){
   if(e.target.id==='_alx')return;
-  e.preventDefault();drag=true;
-  var r=p.getBoundingClientRect();
-  ox=r.left+window.pageXOffset;
-  oy=r.top+window.pageYOffset;
+  e.preventDefault();
+  drag=true;
+  // first drag: read from fixed position, convert to page coords
+  if(curX===null){
+    var r=p.getBoundingClientRect();
+    curX=r.left+window.pageXOffset;
+    curY=r.top+window.pageYOffset;
+    p.style.position='absolute';
+    p.style.right='auto';
+    p.style.bottom='auto';
+    p.style.transform='none';
+  }
+  // anchor start touch
   sx=e.touches[0].clientX;
   sy=e.touches[0].clientY;
-  p.style.position='absolute';
-  p.style.left=ox+'px';
-  p.style.top=oy+'px';
-  p.style.right='auto';
-  p.style.bottom='auto';
-  p.style.transform='none';
+  p.style.left=curX+'px';
+  p.style.top=curY+'px';
 },{passive:false});
 d.addEventListener('touchmove',function(e){
   if(!drag)return;
   e.preventDefault();
-  p.style.left=(ox+(e.touches[0].clientX-sx))+'px';
-  p.style.top=(oy+(e.touches[0].clientY-sy))+'px';
+  var dx=e.touches[0].clientX-sx;
+  var dy=e.touches[0].clientY-sy;
+  p.style.left=(curX+dx)+'px';
+  p.style.top=(curY+dy)+'px';
 },{passive:false});
-d.addEventListener('touchend',function(){drag=false},{passive:true});
+d.addEventListener('touchend',function(e){
+  if(!drag)return;
+  drag=false;
+  // persist final position so next touchstart anchors correctly
+  var r=p.getBoundingClientRect();
+  curX=r.left+window.pageXOffset;
+  curY=r.top+window.pageYOffset;
+},{passive:true});
 
+/* ── LIVE GAME DETECTION ── */
+function isLiveGame(){
+  // bail on game review/analysis pages
+  var url=window.location.href;
+  if(url.indexOf('/game/')>-1&&url.indexOf('/live')===-1)return false;
+  if(url.indexOf('/analysis')>-1)return false;
+  if(url.indexOf('/review')>-1)return false;
+  // DOM signals: review coach bubble, move navigator arrows
+  if(d.querySelector('.review-coach-bubble'))return false;
+  if(d.querySelector('.move-list-buttons'))return false;
+  if(d.querySelector('[data-cy="move-list-backward"]'))return false;
+  // the bottom nav prev/next move buttons appear in review but not live
+  if(d.querySelector('.game-review-controller'))return false;
+  return true;
+}
+
+/* ── CHESS ENGINE (unchanged) ── */
 var FL='abcdefgh';
 var SYM={P:'♙',N:'♘',B:'♗',R:'♖',Q:'♕',K:'♔',p:'♟',n:'♞',b:'♝',r:'♜',q:'♛',k:'♚'};
 var PVAL={p:100,n:320,b:330,r:500,q:900,k:20000};
@@ -71,15 +103,12 @@ var PSQ={
   q:[-20,-10,-10,-5,-5,-10,-10,-20,-10,0,5,0,0,0,0,-10,-10,5,5,5,5,5,0,-10,0,0,5,5,5,5,0,-5,-5,0,5,5,5,5,0,-5,-10,0,5,5,5,5,0,-10,-10,0,0,0,0,0,0,-10,-20,-10,-10,-5,-5,-10,-10,-20],
   k:[20,30,10,0,0,10,30,20,20,20,0,0,0,0,20,20,-10,-20,-20,-20,-20,-20,-20,-10,-20,-30,-30,-40,-40,-30,-30,-20,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30]
 };
-
 function isW(pc){return pc>='A'&&pc<='Z'}
 function sq(f,r){return FL[f]+r}
-function sqIdx(sqStr){return FL.indexOf(sqStr[0])+(parseInt(sqStr[1])-1)*8}
 function psqBonus(pc,sqStr,side){
   var t=pc.toLowerCase();if(!PSQ[t])return 0;
   var f=FL.indexOf(sqStr[0]),r=parseInt(sqStr[1])-1;
-  var idx=side==='w'?f+r*8:f+(7-r)*8;
-  return PSQ[t][idx];
+  return PSQ[t][side==='w'?f+r*8:f+(7-r)*8];
 }
 function applyMove(board,mv){
   var nb={};Object.keys(board).forEach(function(k){nb[k]=board[k]});
@@ -154,8 +183,8 @@ function legalMoves(board,s){return pseudoMoves(board,s).filter(function(mv){ret
 function evalBoard(board){
   var score=0;
   Object.keys(board).forEach(function(sqStr){
-    var pc=board[sqStr],t=pc.toLowerCase(),base=PVAL[t]||0,side=isW(pc)?'w':'b',pos=psqBonus(pc,sqStr,side);
-    score+=side==='w'?base+pos:-(base+pos);
+    var pc=board[sqStr],t=pc.toLowerCase(),base=PVAL[t]||0,side=isW(pc)?'w':'b';
+    score+=side==='w'?base+psqBonus(pc,sqStr,'w'):-(base+psqBonus(pc,sqStr,'b'));
   });
   return score;
 }
@@ -212,6 +241,13 @@ function isGameActive(fen){
   Object.keys(b).forEach(function(s){if(b[s]==='K')wk=true;if(b[s]==='k')bk=true});
   return wk&&bk&&Object.keys(b).length>2;
 }
+function getSamSide(){
+  var el=d.querySelector('chess-board')||d.querySelector('wc-chess-board');
+  if(!el)return'w';
+  return(el.hasAttribute('flipped')||el.classList.contains('flipped'))?'b':'w';
+}
+
+/* ── ARROWS ── */
 var arrowSVG=null;
 function clrArr(){if(arrowSVG){arrowSVG.remove();arrowSVG=null}}
 function drawArrows(moves,side,board){
@@ -252,16 +288,34 @@ function drawArrows(moves,side,board){
   svg.appendChild(defs);d.body.appendChild(svg);arrowSVG=svg;
 }
 window.addEventListener('scroll',function(){if(lastMoves&&lastActive)drawArrows(lastMoves,lastSide,lastBoard)},{passive:true});
+
+/* ── TICK ── */
 var lastFEN='',lastMoves=null,lastSide='w',lastBoard={},lastActive=false;
 function set(t){var el=d.getElementById('_als');if(el)el.textContent=t}
 function show(id,v){var el=d.getElementById(id);if(el)el.textContent=v||'—'}
 function tick(){
+  // kill on review/analysis pages
+  if(!isLiveGame()){
+    if(lastActive){clrArr();show('_b');show('_g');show('_w');set('Not a live game')}
+    lastActive=false;return;
+  }
   var fen=getFEN();
-  if(!fen||!isGameActive(fen)){if(lastActive){clrArr();show('_b');show('_g');show('_w');set('Waiting...')}lastActive=false;return}
-  lastActive=true;if(fen===lastFEN)return;lastFEN=fen;set('Analyzing…');
+  if(!fen||!isGameActive(fen)){
+    if(lastActive){clrArr();show('_b');show('_g');show('_w');set('Waiting...')}
+    lastActive=false;return;
+  }
+  lastActive=true;
+  var parsed=parseFEN(fen);
+  var samSide=getSamSide();
+  if(parsed.side!==samSide){
+    clrArr();show('_b','—');show('_g','—');show('_w','—');
+    set('Opponent thinking…');
+    lastFEN='';return;
+  }
+  if(fen===lastFEN)return;
+  lastFEN=fen;set('Analyzing…');
   setTimeout(function(){
     try{
-      var parsed=parseFEN(fen);
       var res=bestMoves(parsed.board,parsed.side);
       lastMoves=res;lastSide=parsed.side;lastBoard=parsed.board;
       show('_b',label(res.brilliant,parsed.board));
