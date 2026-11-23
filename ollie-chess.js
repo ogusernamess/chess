@@ -360,16 +360,17 @@ function label(mv,board){
   return(SYM[board[mv.slice(0,2)]]||'')+mv.slice(0,2)+'→'+mv.slice(2,4);
 }
 
-// DOM-BASED BOARD READER (Replaces getFEN)
 function getBoardFromDOM() {
+    // wc-chess-board is the current container, shadow DOM may be used, but light DOM holds pieces on mobile view.
     var boardEl = d.querySelector('chess-board') || d.querySelector('wc-chess-board');
     if (!boardEl) return null;
     
+    // Chess.com moved pieces to be direct children of the board, but wrapped in classes like 'piece wp square-52'
+    // If standard selector fails, grab all elements with 'piece' class inside board.
     var pieces = boardEl.querySelectorAll('.piece');
     if (!pieces.length) return null;
     
     var board = {};
-    var isFlipped = boardEl.classList.contains('flipped');
     
     pieces.forEach(function(p) {
         var cls = p.className;
@@ -380,24 +381,36 @@ function getBoardFromDOM() {
         var type = match[2];
         var pieceChar = color === 'w' ? type.toUpperCase() : type;
         
-        // Extract square from class (e.g., "square-52" -> e4)
+        // New chess.com class structure: "square-52" -> file 5, rank 2
         var sqMatch = cls.match(/square-(\d)(\d)/);
         if (sqMatch) {
             var file = parseInt(sqMatch[1]) - 1;
             var rank = parseInt(sqMatch[2]) - 1;
+            // Rank is 1-indexed from top (8) to bottom (1)
             var sqName = FL[file] + (8 - rank);
             board[sqName] = pieceChar;
         }
     });
 
-    // Infer side to move from move list or highlights
+    // Detect side to move
     var side = 'w';
     var moveList = d.querySelector('.vertical-move-list, .move-list');
     if (moveList) {
         var moves = moveList.querySelectorAll('.node');
         if (moves.length % 2 !== 0) side = 'b';
-    } else if (boardEl.querySelector('.highlight')) {
-        // fallback logic if needed
+    } else {
+        // Fallback: Use highlights (yellow = last move)
+        var lastMoveHighlight = boardEl.querySelector('.highlight');
+        if (lastMoveHighlight) {
+            var hlClass = lastMoveHighlight.className;
+            var sqMatch = hlClass.match(/square-(\d)(\d)/);
+            if (sqMatch) {
+                var r = parseInt(sqMatch[2]) - 1;
+                // If last move was on rank 1-2, likely white moved.
+                // If rank 7-8, likely black moved.
+                side = (r >= 6) ? 'w' : 'b';
+            }
+    }
     }
     
     return { board: board, side: side };
@@ -417,16 +430,19 @@ function isGameActive() {
 function getSamSide(){
   var el=d.querySelector('chess-board')||d.querySelector('wc-chess-board');
   if(!el)return'w';
+  // Check if board is flipped
   return el.classList.contains('flipped') ? 'b' : 'w';
 }
 
 function isLiveGame(){
   var url=window.location.href;
-  if(url.indexOf('chess.com/game/live')===-1&&url.indexOf('chess.com/play')===-1)return false;
+  // Chess.com URL changed to /play/computer, /play/online, etc.
+  if(url.indexOf('chess.com/game/')===-1 && url.indexOf('chess.com/play')===-1) return false;
+  
   var el=d.querySelector('chess-board')||d.querySelector('wc-chess-board');
   if(!el)return false;
   
-  // Check for game over modals / elements
+  // Check for game over modals
   if (d.querySelector('.game-over-modal, .game-over, #game-over')) return false;
   
   return true;
@@ -548,7 +564,6 @@ function tick(){
   
   lastActive=true;
   
-  // Synthetic FEN signature to detect state changes
   var currentSig = JSON.stringify(parsed.board) + parsed.side;
   
   var samSide=getSamSide();
