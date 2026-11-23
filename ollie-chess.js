@@ -1,6 +1,9 @@
 (function(){
 sessionStorage.removeItem('_alPanic');
-if(document.getElementById('_al')||document.getElementById('_alQueen'))return;
+['_al','_alQueen','_alStyle'].forEach(function(id){
+  var el=document.getElementById(id);if(el)el.remove();
+});
+if(window._alTick){clearInterval(window._alTick);window._alTick=null;}
 var d=document;
 
 var ss=d.createElement('style');ss.id='_alStyle';
@@ -151,7 +154,9 @@ function attachDrag(el){
       curX=r.left+window.pageXOffset;
       curY=r.top+window.pageYOffset;
       el.style.position='absolute';
-      el.style.right='auto';el.style.bottom='auto';el.style.transform='none';
+      el.style.right='auto';
+      el.style.bottom='auto';
+      el.style.transform='none';
     }
     el.style.left=curX+'px';
     el.style.top=curY+'px';
@@ -390,18 +395,6 @@ function getSamSide(){
 function isLiveGame(){
   var url=window.location.href;
   if(url.indexOf('chess.com/game/live')===-1&&url.indexOf('chess.com/play')===-1)return false;
-  var modal=d.querySelector('.modal-component')||
-            d.querySelector('[class*="modal"]')||
-            d.querySelector('[class*="Modal"]')||
-            d.querySelector('[class*="game-over"]')||
-            d.querySelector('[class*="gameOver"]')||
-            d.querySelector('[class*="aborted"]')||
-            d.querySelector('[class*="Aborted"]');
-  if(modal&&modal.offsetParent!==null)return false;
-  var tabBar=d.querySelector('.tabs-component')||
-             d.querySelector('[data-tab="play"]')||
-             d.querySelector('.tab-item-component');
-  if(tabBar)return false;
   var el=d.querySelector('chess-board')||d.querySelector('wc-chess-board');
   if(!el)return false;
   var game=el.game||el._component||el.__vue__||el._instance;
@@ -511,6 +504,7 @@ window.addEventListener('scroll',function(){
 
 function set(t){var el=d.getElementById('_als');if(el)el.textContent=t}
 function show(id,v){var el=d.getElementById(id);if(el)el.textContent=v||'—'}
+
 function tick(){
   if(!isLiveGame()){
     if(lastActive){clrArr();show('_b');show('_g');show('_w');set('Not a live game')}
