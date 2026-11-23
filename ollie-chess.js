@@ -9,7 +9,7 @@ if(window._alTick){clearInterval(window._alTick);window._alTick=null;}
 var ss=d.createElement('style');ss.id='_alStyle';
 ss.textContent=`
 #_al{position:fixed!important;top:50%!important;right:6px!important;transform:translateY(-50%)!important;
-z-index:2147483647!important;width:168px;background:rgba(10,10,14,.97);
+z-index:2147483647!important;background:rgba(10,10,14,.97);
 border:1.5px solid rgba(255,255,255,.12);border-radius:18px;padding:14px 10px 12px;
 font-family:-apple-system,sans-serif;box-shadow:0 12px 48px rgba(0,0,0,.9);
 color:#fff;touch-action:none;user-select:none}
@@ -69,6 +69,10 @@ var arrowSVG=null;
 function buildPanel(){
   var old=d.getElementById('_al');if(old)old.remove();
   var p=d.createElement('div');p.id='_al';
+  
+  var initW = sessionStorage.getItem('_alSize') || 168;
+  p.style.setProperty('width', initW + 'px', 'important');
+
   p.innerHTML=`
 <button id="_alx">✕</button>
 <div id="_alh">♟ Made By @avoidleaks</div>
@@ -89,11 +93,21 @@ function buildPanel(){
 <div class="_alopt" id="_optB"><span>Brilliant Moves</span><div class="_alcb ${opts.brilliant?'on':''}"></div></div>
 <div class="_alopt" id="_optG"><span>Good Moves</span><div class="_alcb ${opts.good?'on':''}"></div></div>
 <div class="_alopt" id="_optW"><span>Worst Moves</span><div class="_alcb ${opts.worst?'on':''}"></div></div>
-<button id="_alPanic">⚠ PANIC MODE</button>
+<div style="display:flex;align-items:center;gap:8px;margin-top:8px;padding:0 4px;">
+  <span style="font-size:8px;font-weight:700;color:rgba(255,255,255,.5)">SIZE</span>
+  <input type="range" id="_alSize" min="120" max="280" value="${initW}" style="flex:1;height:4px;accent-color:#00B4FF;margin:0;">
+</div>
+<button id="_alPanic" style="margin-top:10px;">⚠ PANIC MODE</button>
 <div id="_albrand">Made By @avoidleaks</div>`;
   d.documentElement.appendChild(p);
 
   d.getElementById('_alx').onclick=minimize;
+
+  d.getElementById('_alSize').oninput = function() {
+    p.style.setProperty('width', this.value + 'px', 'important');
+    sessionStorage.setItem('_alSize', this.value);
+    if(lastMoves) drawArrows(lastMoves, lastSide, lastBoard); // Redraw to adjust to new width if needed
+  };
 
   function mkToggle(id,key,rowIdx){
     d.getElementById(id).onclick=function(){
@@ -146,37 +160,38 @@ function panic(){
 function attachDrag(el){
   el.addEventListener('touchstart',function(e){
     if(e.target.id==='_alx'||e.target.id==='_alPanic'||
-       e.target.closest('._alopt')||e.target.closest('#_alPanic'))return;
+       e.target.closest('._alopt')||e.target.closest('#_alPanic')||
+       e.target.tagName==='INPUT')return;
     e.preventDefault();
     dragActive=true;
-    if(curX===null){
-      var r=el.getBoundingClientRect();
-      curX=r.left+window.pageXOffset;
-      curY=r.top+window.pageYOffset;
-      el.style.position='absolute';
-      el.style.right='auto';
-      el.style.bottom='auto';
-      el.style.transform='none';
-    }
-    el.style.left=curX+'px';
-    el.style.top=curY+'px';
+    var r=el.getBoundingClientRect();
+    curX=r.left;
+    curY=r.top;
+    el.style.setProperty('position', 'fixed', 'important');
+    el.style.setProperty('right', 'auto', 'important');
+    el.style.setProperty('bottom', 'auto', 'important');
+    el.style.setProperty('transform', 'none', 'important');
+    el.style.setProperty('left', curX + 'px', 'important');
+    el.style.setProperty('top', curY + 'px', 'important');
     dsx=e.touches[0].clientX;
     dsy=e.touches[0].clientY;
   },{passive:false});
+  
   d.addEventListener('touchmove',function(e){
     if(!dragActive)return;
     e.preventDefault();
     var el2=d.getElementById('_al');if(!el2)return;
-    el2.style.left=(curX+(e.touches[0].clientX-dsx))+'px';
-    el2.style.top=(curY+(e.touches[0].clientY-dsy))+'px';
+    el2.style.setProperty('left', (curX+(e.touches[0].clientX-dsx))+"px", 'important');
+    el2.style.setProperty('top', (curY+(e.touches[0].clientY-dsy))+"px", 'important');
   },{passive:false});
+  
   d.addEventListener('touchend',function(){
     if(!dragActive)return;
     dragActive=false;
     var el2=d.getElementById('_al');if(!el2)return;
     var r=el2.getBoundingClientRect();
-    curX=r.left+window.pageXOffset;
-    curY=r.top+window.pageYOffset;
+    curX=r.left;
+    curY=r.top;
   },{passive:true});
 }
 
@@ -361,13 +376,12 @@ function label(mv,board){
 }
 
 function getBoardFromDOM() {
-    // wc-chess-board is the current container, shadow DOM may be used, but light DOM holds pieces on mobile view.
     var boardEl = d.querySelector('chess-board') || d.querySelector('wc-chess-board');
     if (!boardEl) return null;
     
-    // Chess.com moved pieces to be direct children of the board, but wrapped in classes like 'piece wp square-52'
-    // If standard selector fails, grab all elements with 'piece' class inside board.
-    var pieces = boardEl.querySelectorAll('.piece');
+    // Dig into shadow DOM if it exists
+    var root = boardEl.shadowRoot || boardEl;
+    var pieces = root.querySelectorAll('.piece');
     if (!pieces.length) return null;
     
     var board = {};
@@ -381,12 +395,10 @@ function getBoardFromDOM() {
         var type = match[2];
         var pieceChar = color === 'w' ? type.toUpperCase() : type;
         
-        // New chess.com class structure: "square-52" -> file 5, rank 2
         var sqMatch = cls.match(/square-(\d)(\d)/);
         if (sqMatch) {
             var file = parseInt(sqMatch[1]) - 1;
             var rank = parseInt(sqMatch[2]) - 1;
-            // Rank is 1-indexed from top (8) to bottom (1)
             var sqName = FL[file] + (8 - rank);
             board[sqName] = pieceChar;
         }
@@ -398,19 +410,6 @@ function getBoardFromDOM() {
     if (moveList) {
         var moves = moveList.querySelectorAll('.node');
         if (moves.length % 2 !== 0) side = 'b';
-    } else {
-        // Fallback: Use highlights (yellow = last move)
-        var lastMoveHighlight = boardEl.querySelector('.highlight');
-        if (lastMoveHighlight) {
-            var hlClass = lastMoveHighlight.className;
-            var sqMatch = hlClass.match(/square-(\d)(\d)/);
-            if (sqMatch) {
-                var r = parseInt(sqMatch[2]) - 1;
-                // If last move was on rank 1-2, likely white moved.
-                // If rank 7-8, likely black moved.
-                side = (r >= 6) ? 'w' : 'b';
-            }
-    }
     }
     
     return { board: board, side: side };
@@ -427,22 +426,23 @@ function isGameActive() {
   return hasK && hask;
 }
 
-function getSamSide(){
-  var el=d.querySelector('chess-board')||d.querySelector('wc-chess-board');
-  if(!el)return'w';
-  // Check if board is flipped
-  return el.classList.contains('flipped') ? 'b' : 'w';
+function isUserTurn() {
+    var activeClock = d.querySelector('.clock-player-turn');
+    var topClock = d.querySelector('.clock-top');
+    // If active clock is ticking for the top player, it's opponent's turn
+    if (activeClock && topClock) {
+        return !topClock.contains(activeClock);
+    }
+    return true; 
 }
 
 function isLiveGame(){
   var url=window.location.href;
-  // Chess.com URL changed to /play/computer, /play/online, etc.
   if(url.indexOf('chess.com/game/')===-1 && url.indexOf('chess.com/play')===-1) return false;
   
   var el=d.querySelector('chess-board')||d.querySelector('wc-chess-board');
   if(!el)return false;
   
-  // Check for game over modals
   if (d.querySelector('.game-over-modal, .game-over, #game-over')) return false;
   
   return true;
@@ -454,15 +454,23 @@ function drawArrows(moves,side,board){
   clrArr();
   if(!moves)return;
   var el=d.querySelector('chess-board')||d.querySelector('wc-chess-board');if(!el)return;
-  var rect=el.getBoundingClientRect();if(rect.width<100)return;
+  
+  // Target the inner .board to avoid coordinate padding offset
+  var innerBoard = el.querySelector('.board') || el;
+  var rect=innerBoard.getBoundingClientRect();if(rect.width<100)return;
+  
   var sqSz=rect.width/8;
   var flip=el.classList.contains('flipped')||(side==='b');
   var pX=window.pageXOffset,pY=window.pageYOffset;
+  
   function sqCenter(sqStr){
     var f=FL.indexOf(sqStr[0]),r=parseInt(sqStr[1])-1;
-    var col=flip?7-f:f,row=flip?r:7-r;
+    var col=flip?7-f:f;
+    // Y-axis is ALWAYS inverted from rank (rank 1 = bottom = row 7)
+    var row=7-r; 
     return[rect.left+pX+col*sqSz+sqSz/2,rect.top+pY+row*sqSz+sqSz/2];
   }
+  
   var bL=rect.left+pX,bT=rect.top+pY;
   var svg=d.createElementNS('http://www.w3.org/2000/svg','svg');
   svg.style.cssText='position:absolute;left:'+bL+'px;top:'+bT+'px;width:'+rect.width+'px;height:'+rect.height+'px;pointer-events:none;z-index:2147483645;overflow:visible';
@@ -564,13 +572,14 @@ function tick(){
   
   lastActive=true;
   
-  var currentSig = JSON.stringify(parsed.board) + parsed.side;
-  
-  var samSide=getSamSide();
-  if(parsed.side!==samSide){
+  // Use clocks to detect if it's the user's turn
+  if(!isUserTurn()){
     clrArr();show('_b','—');show('_g','—');show('_w','—');
     set('Opponent thinking…');lastFEN='';return;
   }
+  
+  var currentSig = JSON.stringify(parsed.board) + parsed.side;
+  
   if(currentSig===lastFEN)return;
   lastFEN=currentSig;set('Analyzing…');
   
