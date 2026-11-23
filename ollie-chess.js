@@ -359,60 +359,88 @@ function label(mv,board){
   if(isCastle(mv))return'♔ '+(mv==='e1g1'||mv==='e8g8'?'0-0':'0-0-0');
   return(SYM[board[mv.slice(0,2)]]||'')+mv.slice(0,2)+'→'+mv.slice(2,4);
 }
-function getFEN(){
-  var src=[
-    function(){var el=d.querySelector('chess-board')||d.querySelector('wc-chess-board');return el&&el.game&&el.game.getFEN&&el.game.getFEN()},
-    function(){var el=d.querySelector('chess-board')||d.querySelector('wc-chess-board');return el&&el.getFEN&&el.getFEN()},
-    function(){var el=d.querySelector('chess-board')||d.querySelector('wc-chess-board');if(!el)return null;var ks=Object.keys(el);for(var i=0;i<ks.length;i++){var v=el[ks[i]];if(v&&typeof v==='object'&&typeof v.getFEN==='function')return v.getFEN()}return null},
-    function(){var el=d.querySelector('chess-board')||d.querySelector('wc-chess-board');var g=el&&(el._component||el.__vue__||el._instance);return g&&typeof g.getFEN==='function'?g.getFEN():g&&g.fen||null},
-    function(){var g=window.chessboard||window.board||window.game;return g&&typeof g.getFEN==='function'?g.getFEN():null}
-  ];
-  for(var i=0;i<src.length;i++){try{var r=src[i]();if(r&&r.indexOf('/')>-1)return r}catch(e){}}
-  return null;
-}
-function parseFEN(fen){
-  var board={},parts=fen.split(' '),rows=parts[0].split('/');
-  for(var ri=0;ri<8;ri++){
-    var fi=0;
-    for(var ci=0;ci<rows[ri].length;ci++){
-      var ch=rows[ri][ci];
-      if(isNaN(ch)){board[FL[fi]+(8-ri)]=ch;fi++}else fi+=parseInt(ch);
+
+// DOM-BASED BOARD READER (Replaces getFEN)
+function getBoardFromDOM() {
+    var boardEl = d.querySelector('chess-board') || d.querySelector('wc-chess-board');
+    if (!boardEl) return null;
+    
+    var pieces = boardEl.querySelectorAll('.piece');
+    if (!pieces.length) return null;
+    
+    var board = {};
+    var isFlipped = boardEl.classList.contains('flipped');
+    
+    pieces.forEach(function(p) {
+        var cls = p.className;
+        var match = cls.match(/\b([wb])([pnbrqk])\b/);
+        if (!match) return;
+        
+        var color = match[1];
+        var type = match[2];
+        var pieceChar = color === 'w' ? type.toUpperCase() : type;
+        
+        // Extract square from class (e.g., "square-52" -> e4)
+        var sqMatch = cls.match(/square-(\d)(\d)/);
+        if (sqMatch) {
+            var file = parseInt(sqMatch[1]) - 1;
+            var rank = parseInt(sqMatch[2]) - 1;
+            var sqName = FL[file] + (8 - rank);
+            board[sqName] = pieceChar;
+        }
+    });
+
+    // Infer side to move from move list or highlights
+    var side = 'w';
+    var moveList = d.querySelector('.vertical-move-list, .move-list');
+    if (moveList) {
+        var moves = moveList.querySelectorAll('.node');
+        if (moves.length % 2 !== 0) side = 'b';
+    } else if (boardEl.querySelector('.highlight')) {
+        // fallback logic if needed
     }
-  }
-  return{board:board,side:parts[1]||'w'};
+    
+    return { board: board, side: side };
 }
-function isGameActive(fen){
-  if(!fen)return false;
-  var p=parseFEN(fen),b=p.board,wk=false,bk=false;
-  Object.keys(b).forEach(function(s){if(b[s]==='K')wk=true;if(b[s]==='k')bk=true});
-  return wk&&bk&&Object.keys(b).length>2;
+
+function isGameActive() {
+  var b = getBoardFromDOM();
+  if (!b) return false;
+  var hasK = false, hask = false;
+  Object.keys(b.board).forEach(function(s){
+      if (b.board[s] === 'K') hasK = true;
+      if (b.board[s] === 'k') hask = true;
+  });
+  return hasK && hask;
 }
+
 function getSamSide(){
   var el=d.querySelector('chess-board')||d.querySelector('wc-chess-board');
   if(!el)return'w';
-  return(el.hasAttribute('flipped')||el.classList.contains('flipped'))?'b':'w';
+  return el.classList.contains('flipped') ? 'b' : 'w';
 }
+
 function isLiveGame(){
   var url=window.location.href;
   if(url.indexOf('chess.com/game/live')===-1&&url.indexOf('chess.com/play')===-1)return false;
   var el=d.querySelector('chess-board')||d.querySelector('wc-chess-board');
   if(!el)return false;
-  var game=el.game||el._component||el.__vue__||el._instance;
-  if(game){
-    if(game.isGameOver&&game.isGameOver())return false;
-    if(game.gameOver===true)return false;
-    if(game.isFinished===true)return false;
-  }
+  
+  // Check for game over modals / elements
+  if (d.querySelector('.game-over-modal, .game-over, #game-over')) return false;
+  
   return true;
 }
+
 function clrArr(){if(arrowSVG){arrowSVG.remove();arrowSVG=null}}
+
 function drawArrows(moves,side,board){
   clrArr();
   if(!moves)return;
   var el=d.querySelector('chess-board')||d.querySelector('wc-chess-board');if(!el)return;
   var rect=el.getBoundingClientRect();if(rect.width<100)return;
   var sqSz=rect.width/8;
-  var flip=el.hasAttribute('flipped')||el.classList.contains('flipped')||(side==='b');
+  var flip=el.classList.contains('flipped')||(side==='b');
   var pX=window.pageXOffset,pY=window.pageYOffset;
   function sqCenter(sqStr){
     var f=FL.indexOf(sqStr[0]),r=parseInt(sqStr[1])-1;
@@ -504,25 +532,33 @@ window.addEventListener('scroll',function(){
 
 function set(t){var el=d.getElementById('_als');if(el)el.textContent=t}
 function show(id,v){var el=d.getElementById(id);if(el)el.textContent=v||'—'}
+
 function tick(){
   if(!isLiveGame()){
     if(lastActive){clrArr();show('_b');show('_g');show('_w');set('Not a live game')}
     lastActive=false;return;
   }
-  var fen=getFEN();
-  if(!fen||!isGameActive(fen)){
+  
+  var parsed = getBoardFromDOM();
+  
+  if(!parsed || !isGameActive()){
     if(lastActive){clrArr();show('_b');show('_g');show('_w');set('Waiting...')}
     lastActive=false;return;
   }
+  
   lastActive=true;
-  var parsed=parseFEN(fen);
+  
+  // Synthetic FEN signature to detect state changes
+  var currentSig = JSON.stringify(parsed.board) + parsed.side;
+  
   var samSide=getSamSide();
   if(parsed.side!==samSide){
     clrArr();show('_b','—');show('_g','—');show('_w','—');
     set('Opponent thinking…');lastFEN='';return;
   }
-  if(fen===lastFEN)return;
-  lastFEN=fen;set('Analyzing…');
+  if(currentSig===lastFEN)return;
+  lastFEN=currentSig;set('Analyzing…');
+  
   setTimeout(function(){
     try{
       var res=bestMoves(parsed.board,parsed.side);
