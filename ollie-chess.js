@@ -1,9 +1,7 @@
 (function(){
-if(document.getElementById('_al')&&!window._alForceReinit)return;
-window._alForceReinit=false;
+sessionStorage.removeItem('_alPanic');
+if(document.getElementById('_al')||document.getElementById('_alQueen'))return;
 var d=document;
-
-if(sessionStorage.getItem('_alPanic')==='1')return;
 
 var ss=d.createElement('style');ss.id='_alStyle';
 ss.textContent=`
@@ -61,6 +59,9 @@ margin-top:8px;letter-spacing:.5px}
 d.head.appendChild(ss);
 
 var opts={brilliant:true,good:true,worst:true};
+var lastFEN='',lastMoves=null,lastSide='w',lastBoard={},lastActive=false;
+var curX=null,curY=null,dragActive=false,dsx=0,dsy=0;
+var arrowSVG=null;
 
 function buildPanel(){
   var old=d.getElementById('_al');if(old)old.remove();
@@ -103,7 +104,7 @@ function buildPanel(){
   mkToggle('_optG','good',1);
   mkToggle('_optW','worst',2);
 
-  var panicArmed=false,panicTimer=null;
+  var panicArmed=false;
   d.getElementById('_alPanic').onclick=function(){
     if(panicArmed){
       panic();
@@ -111,7 +112,7 @@ function buildPanel(){
       panicArmed=true;
       this.classList.add('armed');
       this.textContent='⚠ TAP AGAIN TO PANIC';
-      panicTimer=setTimeout(function(){
+      setTimeout(function(){
         panicArmed=false;
         var btn=d.getElementById('_alPanic');
         if(btn){btn.classList.remove('armed');btn.textContent='⚠ PANIC MODE';}
@@ -131,15 +132,14 @@ function minimize(){
 }
 
 function panic(){
-  sessionStorage.setItem('_alPanic','1');
   clrArr();
   ['_al','_alQueen','_alStyle'].forEach(function(id){
     var el=d.getElementById(id);if(el)el.remove();
   });
   if(window._alTick){clearInterval(window._alTick);window._alTick=null;}
+  lastMoves=null;lastActive=false;lastFEN='';
 }
 
-var curX=null,curY=null,dragActive=false,dsx=0,dsy=0;
 function attachDrag(el){
   el.addEventListener('touchstart',function(e){
     if(e.target.id==='_alx'||e.target.id==='_alPanic'||
@@ -354,7 +354,6 @@ function label(mv,board){
   if(isCastle(mv))return'♔ '+(mv==='e1g1'||mv==='e8g8'?'0-0':'0-0-0');
   return(SYM[board[mv.slice(0,2)]]||'')+mv.slice(0,2)+'→'+mv.slice(2,4);
 }
-
 function getFEN(){
   var src=[
     function(){var el=d.querySelector('chess-board')||d.querySelector('wc-chess-board');return el&&el.game&&el.game.getFEN&&el.game.getFEN()},
@@ -413,8 +412,6 @@ function isLiveGame(){
   }
   return true;
 }
-
-var arrowSVG=null;
 function clrArr(){if(arrowSVG){arrowSVG.remove();arrowSVG=null}}
 function drawArrows(moves,side,board){
   clrArr();
@@ -508,17 +505,13 @@ function drawArrows(moves,side,board){
   d.body.appendChild(svg);
   arrowSVG=svg;
 }
-
 window.addEventListener('scroll',function(){
   if(lastMoves&&lastActive)drawArrows(lastMoves,lastSide,lastBoard);
 },{passive:true});
 
-var lastFEN='',lastMoves=null,lastSide='w',lastBoard={},lastActive=false;
 function set(t){var el=d.getElementById('_als');if(el)el.textContent=t}
 function show(id,v){var el=d.getElementById(id);if(el)el.textContent=v||'—'}
-
 function tick(){
-  if(sessionStorage.getItem('_alPanic')==='1')return;
   if(!isLiveGame()){
     if(lastActive){clrArr();show('_b');show('_g');show('_w');set('Not a live game')}
     lastActive=false;return;
