@@ -3,10 +3,8 @@ if(document.getElementById('_al')&&!window._alForceReinit)return;
 window._alForceReinit=false;
 var d=document;
 
-/* ── PANIC: if already nuked, stay dead ── */
 if(sessionStorage.getItem('_alPanic')==='1')return;
 
-/* ── STYLES ── */
 var ss=d.createElement('style');ss.id='_alStyle';
 ss.textContent=`
 #_al{position:fixed!important;top:50%!important;right:6px!important;transform:translateY(-50%)!important;
@@ -40,7 +38,7 @@ transition:background .15s}
 flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s}
 ._alcb.on{background:#00B4FF;border-color:#00B4FF}
 ._alcb.on::after{content:'✓';font-size:9px;color:#000;font-weight:900}
-#_alPanic{width:100%;margin-top:8px;padding:7px;border-radius:10px;border:none;
+#_alPanic{width:100%;margin-top:8px;padding:7px;border-radius:10px;
 background:rgba(255,59,48,.15);border:1.5px solid rgba(255,59,48,.4);
 color:#FF3B30;font-size:9px;font-weight:800;letter-spacing:1px;cursor:pointer;
 text-transform:uppercase;transition:all .15s}
@@ -56,20 +54,20 @@ z-index:2147483647!important;cursor:pointer;
 display:flex;align-items:center;justify-content:center;
 font-size:24px;border:none;touch-action:none;
 transition:transform .15s,box-shadow .15s}
-#_alQueen:active{transform:scale(.92);box-shadow:0 2px 10px rgba(0,100,255,.4)}
+#_alQueen:active{transform:scale(.92)}
+#_albrand{font-size:7px;color:rgba(255,255,255,.2);text-align:center;
+margin-top:8px;letter-spacing:.5px}
 `;
 d.head.appendChild(ss);
 
-/* ── OPTIONS STATE ── */
 var opts={brilliant:true,good:true,worst:true};
 
-/* ── BUILD PANEL ── */
 function buildPanel(){
   var old=d.getElementById('_al');if(old)old.remove();
   var p=d.createElement('div');p.id='_al';
   p.innerHTML=`
 <button id="_alx">✕</button>
-<div id="_alh">♟ @avoidleaks</div>
+<div id="_alh">♟ Made By @avoidleaks</div>
 <div class="_alr _alrb ${opts.brilliant?'':'_alrd'}">
   <div class="_ald"></div>
   <div style="flex:1"><div class="_all">Brilliant</div><div class="_alv" id="_b">—</div></div>
@@ -87,35 +85,27 @@ function buildPanel(){
 <div class="_alopt" id="_optB"><span>Brilliant Moves</span><div class="_alcb ${opts.brilliant?'on':''}"></div></div>
 <div class="_alopt" id="_optG"><span>Good Moves</span><div class="_alcb ${opts.good?'on':''}"></div></div>
 <div class="_alopt" id="_optW"><span>Worst Moves</span><div class="_alcb ${opts.worst?'on':''}"></div></div>
-<button id="_alPanic">⚠ PANIC MODE</button>`;
+<button id="_alPanic">⚠ PANIC MODE</button>
+<div id="_albrand">Made By @avoidleaks</div>`;
   d.documentElement.appendChild(p);
 
-  /* close → minimize */
   d.getElementById('_alx').onclick=minimize;
 
-  /* option toggles */
-  function mkToggle(id,key){
+  function mkToggle(id,key,rowIdx){
     d.getElementById(id).onclick=function(){
       opts[key]=!opts[key];
-      var cb=this.querySelector('._alcb');
-      cb.classList.toggle('on',opts[key]);
-      var row={brilliant:'_alrb',good:'_alrg',worst:'_alrw'};
-      // dim the matching row
-      var rows=p.querySelectorAll('._alr');
-      var idx={brilliant:0,good:1,worst:2}[key];
-      rows[idx].classList.toggle('_alrd',!opts[key]);
+      this.querySelector('._alcb').classList.toggle('on',opts[key]);
+      p.querySelectorAll('._alr')[rowIdx].classList.toggle('_alrd',!opts[key]);
       if(lastMoves)drawArrows(lastMoves,lastSide,lastBoard);
     };
   }
-  mkToggle('_optB','brilliant');
-  mkToggle('_optG','good');
-  mkToggle('_optW','worst');
+  mkToggle('_optB','brilliant',0);
+  mkToggle('_optG','good',1);
+  mkToggle('_optW','worst',2);
 
-  /* panic */
   var panicArmed=false,panicTimer=null;
   d.getElementById('_alPanic').onclick=function(){
     if(panicArmed){
-      // second tap → nuke
       panic();
     } else {
       panicArmed=true;
@@ -129,11 +119,9 @@ function buildPanel(){
     }
   };
 
-  /* drag */
   attachDrag(p);
 }
 
-/* ── MINIMIZE / RESTORE ── */
 function minimize(){
   clrArr();
   var p=d.getElementById('_al');if(p)p.remove();
@@ -142,16 +130,15 @@ function minimize(){
   q.onclick=function(){q.remove();buildPanel();};
 }
 
-/* ── PANIC — nuke everything, leave no trace ── */
 function panic(){
   sessionStorage.setItem('_alPanic','1');
   clrArr();
-  ['_al','_alQueen','_alStyle'].forEach(function(id){var el=d.getElementById(id);if(el)el.remove();});
-  // clear interval
+  ['_al','_alQueen','_alStyle'].forEach(function(id){
+    var el=d.getElementById(id);if(el)el.remove();
+  });
   if(window._alTick){clearInterval(window._alTick);window._alTick=null;}
 }
 
-/* ── DRAG — persistent curX/curY, both axes ── */
 var curX=null,curY=null,dragActive=false,dsx=0,dsy=0;
 function attachDrag(el){
   el.addEventListener('touchstart',function(e){
@@ -188,7 +175,6 @@ function attachDrag(el){
   },{passive:true});
 }
 
-/* ── CHESS ENGINE ── */
 var FL='abcdefgh';
 var SYM={P:'♙',N:'♘',B:'♗',R:'♖',Q:'♕',K:'♔',p:'♟',n:'♞',b:'♝',r:'♜',q:'♛',k:'♚'};
 var PVAL={p:100,n:320,b:330,r:500,q:900,k:20000};
@@ -200,6 +186,7 @@ var PSQ={
   q:[-20,-10,-10,-5,-5,-10,-10,-20,-10,0,5,0,0,0,0,-10,-10,5,5,5,5,5,0,-10,0,0,5,5,5,5,0,-5,-5,0,5,5,5,5,0,-5,-10,0,5,5,5,5,0,-10,-10,0,0,0,0,0,0,-10,-20,-10,-10,-5,-5,-10,-10,-20],
   k:[20,30,10,0,0,10,30,20,20,20,0,0,0,0,20,20,-10,-20,-20,-20,-20,-20,-20,-10,-20,-30,-30,-40,-40,-30,-30,-20,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30]
 };
+
 function isW(pc){return pc>='A'&&pc<='Z'}
 function sq(f,r){return FL[f]+r}
 function psqBonus(pc,sqStr,side){
@@ -241,7 +228,10 @@ function isAttacked(board,sq2,byS){
   }
   return false;
 }
-function inCheck(board,s){var ks=kingSquare(board,s);if(!ks)return false;return isAttacked(board,ks,s==='w'?'b':'w')}
+function inCheck(board,s){
+  var ks=kingSquare(board,s);if(!ks)return false;
+  return isAttacked(board,ks,s==='w'?'b':'w');
+}
 function pseudoMoves(board,s){
   var moves=[];
   Object.keys(board).forEach(function(from){
@@ -252,15 +242,27 @@ function pseudoMoves(board,s){
       var dir=s==='w'?1:-1,nr=r+dir;
       if(nr>=1&&nr<=8){
         var fwd=sq(f,nr);
-        if(!board[fwd]){moves.push(from+fwd);var sr=s==='w'?2:7;if(r===sr){var d2=sq(f,r+2*dir);if(!board[d2])moves.push(from+d2)}}
-        [-1,1].forEach(function(df){var cf=f+df;if(cf>=0&&cf<8){var cap=sq(cf,nr);if(board[cap]&&(s==='w'?!isW(board[cap]):isW(board[cap])))moves.push(from+cap)}});
+        if(!board[fwd]){
+          moves.push(from+fwd);
+          var sr=s==='w'?2:7;
+          if(r===sr){var d2=sq(f,r+2*dir);if(!board[d2])moves.push(from+d2)}
+        }
+        [-1,1].forEach(function(df){
+          var cf=f+df;
+          if(cf>=0&&cf<8){var cap=sq(cf,nr);if(board[cap]&&(s==='w'?!isW(board[cap]):isW(board[cap])))moves.push(from+cap)}
+        });
       }
     }
     if(t==='n')[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(function(dd){
       var nf=f+dd[0],nr2=r+dd[1];
-      if(nf>=0&&nf<8&&nr2>=1&&nr2<=8){var to=sq(nf,nr2);if(!(board[to]&&(s==='w'?isW(board[to]):!isW(board[to]))))moves.push(from+to)}
+      if(nf>=0&&nf<8&&nr2>=1&&nr2<=8){
+        var to=sq(nf,nr2);
+        if(!(board[to]&&(s==='w'?isW(board[to]):!isW(board[to]))))moves.push(from+to);
+      }
     });
-    var rays=t==='b'?[[1,1],[1,-1],[-1,1],[-1,-1]]:t==='r'?[[1,0],[-1,0],[0,1],[0,-1]]:t==='q'?[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]:[];
+    var rays=t==='b'?[[1,1],[1,-1],[-1,1],[-1,-1]]:
+             t==='r'?[[1,0],[-1,0],[0,1],[0,-1]]:
+             t==='q'?[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]:[];
     rays.forEach(function(ray){
       var cf=f+ray[0],cr=r+ray[1];
       while(cf>=0&&cf<8&&cr>=1&&cr<=8){
@@ -270,11 +272,13 @@ function pseudoMoves(board,s){
       }
     });
     if(t==='k'){
-      [[ 1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]].forEach(function(dd){
+      [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]].forEach(function(dd){
         var nf=f+dd[0],nr3=r+dd[1];
-        if(nf>=0&&nf<8&&nr3>=1&&nr3<=8){var to=sq(nf,nr3);if(!(board[to]&&(s==='w'?isW(board[to]):!isW(board[to]))))moves.push(from+to)}
+        if(nf>=0&&nf<8&&nr3>=1&&nr3<=8){
+          var to=sq(nf,nr3);
+          if(!(board[to]&&(s==='w'?isW(board[to]):!isW(board[to]))))moves.push(from+to);
+        }
       });
-      // castling
       if(s==='w'&&from==='e1'){
         if(board['h1']==='R'&&!board['f1']&&!board['g1']&&
            !isAttacked(board,'e1','b')&&!isAttacked(board,'f1','b')&&!isAttacked(board,'g1','b'))
@@ -295,7 +299,9 @@ function pseudoMoves(board,s){
   });
   return moves;
 }
-function legalMoves(board,s){return pseudoMoves(board,s).filter(function(mv){return!inCheck(applyMove(board,mv),s)})}
+function legalMoves(board,s){
+  return pseudoMoves(board,s).filter(function(mv){return!inCheck(applyMove(board,mv),s)});
+}
 function evalBoard(board){
   var score=0;
   Object.keys(board).forEach(function(sqStr){
@@ -308,7 +314,9 @@ function mvvLva(board,mv){
   var vic=board[mv.slice(2,4)];if(!vic)return 0;
   return(PVAL[vic.toLowerCase()]||0)*10-(PVAL[(board[mv.slice(0,2)]||'p').toLowerCase()]||0);
 }
-function orderMoves(board,moves){return moves.slice().sort(function(a,b){return mvvLva(board,b)-mvvLva(board,a)})}
+function orderMoves(board,moves){
+  return moves.slice().sort(function(a,b){return mvvLva(board,b)-mvvLva(board,a)});
+}
 var NODES=0;
 function negamax(board,s,depth,alpha,beta){
   NODES++;
@@ -332,23 +340,21 @@ function bestMoves(board,s){
     return{mv:mv,sc:-negamax(applyMove(board,mv),opp,2,-Infinity,Infinity)};
   }).sort(function(a,b){return b.sc-a.sc});
   var n=scored.length;
-  return{brilliant:scored[0].mv,good:scored[Math.min(Math.floor(n*0.3),n-1)].mv,worst:scored[n-1].mv};
+  return{
+    brilliant:scored[0].mv,
+    good:scored[Math.min(Math.floor(n*0.3),n-1)].mv,
+    worst:scored[n-1].mv
+  };
 }
-
-/* ── CASTLE LABEL ── */
 function isCastle(mv){
   return mv==='e1g1'||mv==='e1c1'||mv==='e8g8'||mv==='e8c8';
 }
-function castleLabel(mv){
-  return(mv==='e1g1'||mv==='e8g8')?'0-0':'0-0-0';
-}
 function label(mv,board){
   if(!mv)return'—';
-  if(isCastle(mv))return'♔ '+castleLabel(mv);
+  if(isCastle(mv))return'♔ '+(mv==='e1g1'||mv==='e8g8'?'0-0':'0-0-0');
   return(SYM[board[mv.slice(0,2)]]||'')+mv.slice(0,2)+'→'+mv.slice(2,4);
 }
 
-/* ── FEN ── */
 function getFEN(){
   var src=[
     function(){var el=d.querySelector('chess-board')||d.querySelector('wc-chess-board');return el&&el.game&&el.game.getFEN&&el.game.getFEN()},
@@ -362,7 +368,13 @@ function getFEN(){
 }
 function parseFEN(fen){
   var board={},parts=fen.split(' '),rows=parts[0].split('/');
-  for(var ri=0;ri<8;ri++){var fi=0;for(var ci=0;ci<rows[ri].length;ci++){var ch=rows[ri][ci];if(isNaN(ch)){board[FL[fi]+(8-ri)]=ch;fi++}else fi+=parseInt(ch)}}
+  for(var ri=0;ri<8;ri++){
+    var fi=0;
+    for(var ci=0;ci<rows[ri].length;ci++){
+      var ch=rows[ri][ci];
+      if(isNaN(ch)){board[FL[fi]+(8-ri)]=ch;fi++}else fi+=parseInt(ch);
+    }
+  }
   return{board:board,side:parts[1]||'w'};
 }
 function isGameActive(fen){
@@ -379,22 +391,31 @@ function getSamSide(){
 function isLiveGame(){
   var url=window.location.href;
   if(url.indexOf('chess.com/game/live')===-1&&url.indexOf('chess.com/play')===-1)return false;
-  var el=d.querySelector('chess-board')||d.querySelector('wc-chess-board');if(!el)return false;
+  var modal=d.querySelector('.modal-component')||
+            d.querySelector('[class*="modal"]')||
+            d.querySelector('[class*="Modal"]')||
+            d.querySelector('[class*="game-over"]')||
+            d.querySelector('[class*="gameOver"]')||
+            d.querySelector('[class*="aborted"]')||
+            d.querySelector('[class*="Aborted"]');
+  if(modal&&modal.offsetParent!==null)return false;
+  var tabBar=d.querySelector('.tabs-component')||
+             d.querySelector('[data-tab="play"]')||
+             d.querySelector('.tab-item-component');
+  if(tabBar)return false;
+  var el=d.querySelector('chess-board')||d.querySelector('wc-chess-board');
+  if(!el)return false;
   var game=el.game||el._component||el.__vue__||el._instance;
   if(game){
     if(game.isGameOver&&game.isGameOver())return false;
     if(game.gameOver===true)return false;
     if(game.isFinished===true)return false;
   }
-  var tabBar=d.querySelector('.tabs-component')||d.querySelector('[data-tab="play"]')||d.querySelector('.tab-item-component');
-  if(tabBar)return false;
   return true;
 }
 
-/* ── ARROWS + DESTINATION CIRCLES — curved bezier, fat stroke ── */
 var arrowSVG=null;
 function clrArr(){if(arrowSVG){arrowSVG.remove();arrowSVG=null}}
-
 function drawArrows(moves,side,board){
   clrArr();
   if(!moves)return;
@@ -403,54 +424,35 @@ function drawArrows(moves,side,board){
   var sqSz=rect.width/8;
   var flip=el.hasAttribute('flipped')||el.classList.contains('flipped')||(side==='b');
   var pX=window.pageXOffset,pY=window.pageYOffset;
-
   function sqCenter(sqStr){
     var f=FL.indexOf(sqStr[0]),r=parseInt(sqStr[1])-1;
     var col=flip?7-f:f,row=flip?r:7-r;
-    return[rect.left+pX+col*sqSz+sqSz/2, rect.top+pY+row*sqSz+sqSz/2];
+    return[rect.left+pX+col*sqSz+sqSz/2,rect.top+pY+row*sqSz+sqSz/2];
   }
-
   var bL=rect.left+pX,bT=rect.top+pY;
   var svg=d.createElementNS('http://www.w3.org/2000/svg','svg');
   svg.style.cssText='position:absolute;left:'+bL+'px;top:'+bT+'px;width:'+rect.width+'px;height:'+rect.height+'px;pointer-events:none;z-index:2147483645;overflow:visible';
   var defs=d.createElementNS('http://www.w3.org/2000/svg','defs');
-
   var arr=[
-    {key:'brilliant',m:moves.brilliant,c1:'#0044FF',c2:'#00DDFF',glow:'rgba(0,180,255,.5)'},
-    {key:'good',     m:moves.good,     c1:'#55AA00',c2:'#AAFF00',glow:'rgba(130,220,0,.5)'},
-    {key:'worst',    m:moves.worst,    c1:'#CC1A10',c2:'#FF6B52',glow:'rgba(255,80,50,.5)'}
+    {key:'brilliant',m:moves.brilliant,c1:'#0044FF',c2:'#00DDFF'},
+    {key:'good',     m:moves.good,     c1:'#55AA00',c2:'#AAFF00'},
+    {key:'worst',    m:moves.worst,    c1:'#CC1A10',c2:'#FF6B52'}
   ];
-
   arr.forEach(function(a,i){
     if(!opts[a.key])return;
     if(!a.m||a.m.length<4)return;
-
-    var isCastle_=isCastle(a.m);
-    var fromSq=a.m.slice(0,2),toSq=a.m.slice(2,4);
-
-    // for castling: show king-side rook target square visually
-    var displayTo=toSq;
-    if(isCastle_){
-      displayTo=(a.m==='e1g1')?'g1':(a.m==='e1c1')?'c1':(a.m==='e8g8')?'g8':'c8';
-    }
-
-    var p1=sqCenter(fromSq),p2=sqCenter(displayTo);
+    var fromSq=a.m.slice(0,2);
+    var toSq=isCastle(a.m)?(a.m==='e1g1'?'g1':a.m==='e1c1'?'c1':a.m==='e8g8'?'g8':'c8'):a.m.slice(2,4);
+    var p1=sqCenter(fromSq),p2=sqCenter(toSq);
     var x1=p1[0]-bL,y1=p1[1]-bT,x2=p2[0]-bL,y2=p2[1]-bT;
-
-    // curve: perpendicular offset for bezier control point
-    var dx=x2-x1,dy=y2-y1,len=Math.sqrt(dx*dx+dy*dy);
-    var perp=len*0.18; // curve amount
-    var cpx=(x1+x2)/2 - (dy/len)*perp;
-    var cpy=(y1+y2)/2 + (dx/len)*perp;
-
-    // shorten end point so arrowhead doesn't overshoot square center
+    var dx=x2-x1,dy=y2-y1,len=Math.sqrt(dx*dx+dy*dy)||1;
+    var perp=len*0.18;
+    var cpx=(x1+x2)/2-(dy/len)*perp;
+    var cpy=(y1+y2)/2+(dx/len)*perp;
+    var tdx=x2-cpx,tdy=y2-cpy,tlen=Math.sqrt(tdx*tdx+tdy*tdy)||1;
     var shrink=sqSz*0.28;
-    var ex=x2-(x2-cpx)/Math.sqrt((x2-cpx)*(x2-cpx)+(y2-cpy)*(y2-cpy))*shrink;
-    var ey=y2-(y2-cpy)/Math.sqrt((x2-cpx)*(x2-cpx)+(y2-cpy)*(y2-cpy))*shrink;
-
+    var ex=x2-(tdx/tlen)*shrink,ey=y2-(tdy/tlen)*shrink;
     var gid='ag'+i,fid='af'+i,mid='am'+i;
-
-    // gradient
     var grad=d.createElementNS('http://www.w3.org/2000/svg','linearGradient');
     grad.setAttribute('id',gid);grad.setAttribute('gradientUnits','userSpaceOnUse');
     grad.setAttribute('x1',x1);grad.setAttribute('y1',y1);
@@ -460,42 +462,32 @@ function drawArrows(moves,side,board){
     var s2=d.createElementNS('http://www.w3.org/2000/svg','stop');
     s2.setAttribute('offset','100%');s2.setAttribute('stop-color',a.c2);
     grad.appendChild(s1);grad.appendChild(s2);defs.appendChild(grad);
-
-    // glow filter
     var filt=d.createElementNS('http://www.w3.org/2000/svg','filter');
     filt.setAttribute('id',fid);filt.setAttribute('x','-50%');filt.setAttribute('y','-50%');
     filt.setAttribute('width','200%');filt.setAttribute('height','200%');
     var blur=d.createElementNS('http://www.w3.org/2000/svg','feGaussianBlur');
-    blur.setAttribute('stdDeviation','3');blur.setAttribute('result','coloredBlur');
+    blur.setAttribute('stdDeviation','2.5');blur.setAttribute('result','coloredBlur');
     var merge=d.createElementNS('http://www.w3.org/2000/svg','feMerge');
-    var mn1=d.createElementNS('http://www.w3.org/2000/svg','feMergeNode');
-    mn1.setAttribute('in','coloredBlur');
-    var mn2=d.createElementNS('http://www.w3.org/2000/svg','feMergeNode');
-    mn2.setAttribute('in','SourceGraphic');
+    var mn1=d.createElementNS('http://www.w3.org/2000/svg','feMergeNode');mn1.setAttribute('in','coloredBlur');
+    var mn2=d.createElementNS('http://www.w3.org/2000/svg','feMergeNode');mn2.setAttribute('in','SourceGraphic');
     merge.appendChild(mn1);merge.appendChild(mn2);
     filt.appendChild(blur);filt.appendChild(merge);defs.appendChild(filt);
-
-    // arrowhead marker
     var mk=d.createElementNS('http://www.w3.org/2000/svg','marker');
     mk.setAttribute('id',mid);mk.setAttribute('markerWidth','6');mk.setAttribute('markerHeight','6');
     mk.setAttribute('refX','5');mk.setAttribute('refY','3');mk.setAttribute('orient','auto');
     var poly=d.createElementNS('http://www.w3.org/2000/svg','polygon');
     poly.setAttribute('points','0 0,6 3,0 6');poly.setAttribute('fill',a.c2);
     mk.appendChild(poly);defs.appendChild(mk);
-
-    // curved path
     var path=d.createElementNS('http://www.w3.org/2000/svg','path');
     path.setAttribute('d','M'+x1+','+y1+' Q'+cpx+','+cpy+' '+ex+','+ey);
     path.setAttribute('stroke','url(#'+gid+')');
     path.setAttribute('stroke-width','5');
     path.setAttribute('fill','none');
     path.setAttribute('stroke-linecap','round');
-    path.setAttribute('opacity','0.82');
+    path.setAttribute('opacity','0.85');
     path.setAttribute('filter','url(#'+fid+')');
     path.setAttribute('marker-end','url(#'+mid+')');
     svg.appendChild(path);
-
-    // destination circle
     var circ=d.createElementNS('http://www.w3.org/2000/svg','circle');
     circ.setAttribute('cx',x2);circ.setAttribute('cy',y2);
     circ.setAttribute('r',sqSz*0.32);
@@ -505,8 +497,6 @@ function drawArrows(moves,side,board){
     circ.setAttribute('opacity','0.75');
     circ.setAttribute('filter','url(#'+fid+')');
     svg.appendChild(circ);
-
-    // inner dot in destination circle
     var dot=d.createElementNS('http://www.w3.org/2000/svg','circle');
     dot.setAttribute('cx',x2);dot.setAttribute('cy',y2);
     dot.setAttribute('r',sqSz*0.1);
@@ -514,7 +504,6 @@ function drawArrows(moves,side,board){
     dot.setAttribute('opacity','0.6');
     svg.appendChild(dot);
   });
-
   svg.appendChild(defs);
   d.body.appendChild(svg);
   arrowSVG=svg;
@@ -524,7 +513,6 @@ window.addEventListener('scroll',function(){
   if(lastMoves&&lastActive)drawArrows(lastMoves,lastSide,lastBoard);
 },{passive:true});
 
-/* ── TICK ── */
 var lastFEN='',lastMoves=null,lastSide='w',lastBoard={},lastActive=false;
 function set(t){var el=d.getElementById('_als');if(el)el.textContent=t}
 function show(id,v){var el=d.getElementById(id);if(el)el.textContent=v||'—'}
