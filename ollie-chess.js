@@ -1,10 +1,10 @@
 (function(){
+var d=document;
 sessionStorage.removeItem('_alPanic');
-['_al','_alQueen','_alStyle'].forEach(function(id){
-  var el=document.getElementById(id);if(el)el.remove();
+['_al','_alQueen','_alStyle','_alScript'].forEach(function(id){
+  var el=d.getElementById(id);if(el)el.remove();
 });
 if(window._alTick){clearInterval(window._alTick);window._alTick=null;}
-var d=document;
 
 var ss=d.createElement('style');ss.id='_alStyle';
 ss.textContent=`
@@ -504,7 +504,6 @@ window.addEventListener('scroll',function(){
 
 function set(t){var el=d.getElementById('_als');if(el)el.textContent=t}
 function show(id,v){var el=d.getElementById(id);if(el)el.textContent=v||'—'}
-
 function tick(){
   if(!isLiveGame()){
     if(lastActive){clrArr();show('_b');show('_g');show('_w');set('Not a live game')}
@@ -538,7 +537,6 @@ function tick(){
 }
 
 buildPanel();
-if(window._alTick)clearInterval(window._alTick);
 window._alTick=setInterval(tick,1200);
 tick();setTimeout(tick,600);setTimeout(tick,2000);
 })();
